@@ -1,5 +1,7 @@
 import mxnet as mx
 
+import numpy as np
+
 import argparse
 import os, sys 
 
@@ -27,16 +29,6 @@ def get_loc(data, attr = {'lr_mult': '0.01'}):
     loc = mx.symbol.FullyConnected(data = loc, num_hidden = 6, name = 'stn_loc', attr = attr)
     return loc 
 
-def get_mlp():
-    data = mx.symbol.Variable('data')
-    fc1 = mx.symbol.FullyConnected(data = data, name = 'fc1', num_hidden = 128)
-    act1 = mx.symbol.Activation(data = fc1, name = 'relu1', act_type = 'relu')
-    fc2 = mx.symbol.FullyConnected(data = act1, name = 'fc2', num_hidden = 64)
-    act2 = mx.symbol.Activation(data = fc2, name = 'relu2', act_type = 'relu')
-    fc3 = mx.symbol.FullyConnected(data = act2, name = 'fc3', num_hidden = 10)
-    mlp = mx.symbol.SoftmaxOutput(data = fc3, name = 'softmax')
-    return mlp 
-
 def get_lenet(add_stn = False):
     data = mx.symbol.Variable('data')
     if (add_stn):
@@ -61,3 +53,14 @@ def get_lenet(add_stn = False):
     fc2 = mx.symbol.FullyConnected(data = tanh3, num_hidden = 10)
     lenet = mx.symbol.SoftmaxOutput(data = fc2, name = 'softmax')
     return lenet
+
+def get_mlp():  
+    data = mx.symbol.Variable('data')
+    label = mx.symbol.Variable('softmax_label')
+    fc1 = mx.symbol.FullyConnected(data = data, name = 'fc1', num_hidden = 128)
+    act1 = mx.symbol.Activation(data = fc1, name = 'relu1', act_type = 'relu')
+    fc2 = mx.symbol.FullyConnected(data = act1, name = 'fc2', num_hidden = 64)
+    act2 = mx.symbol.Activation(data = fc2, name = 'relu2', act_type = 'relu')
+    fc3 = mx.symbol.FullyConnected(data = act2, name = 'fc3', num_hidden = 10)
+    mlp = mx.symbol.SoftmaxOutput(data = fc3, label = label, name = 'softmax')
+    return mlp 
