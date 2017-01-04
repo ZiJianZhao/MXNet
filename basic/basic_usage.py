@@ -11,12 +11,12 @@ import logging
 # logging config: output to both file and terminal 
 def init_logging(log_filename = 'LOG'):
     logging.basicConfig(
-                    level    = logging.DEBUG,
-                    format   = '%(filename)-20s LINE %(lineno)-4d %(levelname)-8s %(asctime)s %(message)s',
-                    datefmt  = '%m-%d %H:%M:%S',
-                    filename = log_filename,
-                    filemode = 'w'
-                )
+        level    = logging.DEBUG,
+        format   = '%(filename)-20s LINE %(lineno)-4d %(levelname)-8s %(asctime)s %(message)s',
+        datefmt  = '%m-%d %H:%M:%S',
+        filename = log_filename,
+        filemode = 'w'
+    )
     # define a Handler which writes INFO messages or higher to the sys.stderr
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
@@ -56,12 +56,12 @@ def visualization(symbol = None, shape = None):
     if symbol is None:
         return
     dot_graph = mx.viz.plot_network(
-                        symbol = symbol,
-                        save_format = 'pdf',
-                        shape = shape,
-                        node_attrs = {'shape':'rect', 'fixedsize':'false'},
-                        hide_weights = True
-                    )
+        symbol = symbol,
+        save_format = 'pdf',
+        shape = shape,
+        node_attrs = {'shape':'rect', 'fixedsize':'false'},
+        hide_weights = True
+    )
     dot_graph.render('network.gv' ,view = True)
 
 
@@ -95,11 +95,12 @@ def bind_evaluate():
     grad_arguments = {}
     grad_arguments['A'] = mx.nd.ones((10, ), ctx=mx.cpu())
     grad_arguments['B'] = mx.nd.ones((10, ), ctx=mx.cpu())
-    ex = c.bind(ctx = mx.cpu(),
-                args = input_arguments,
-                args_grad = grad_arguments,
-                grad_req = 'write'
-            )
+    ex = c.bind(
+        ctx = mx.cpu(),
+        args = input_arguments,
+        args_grad = grad_arguments,
+        grad_req = 'write'
+    )
     ex.arg_dict['A'][:] = np.random.rand(10,)
     ex.arg_dict['B'][:] = np.random.rand(10,)
     ex.forward()
@@ -122,12 +123,49 @@ def auto_differention():
     d = c.grad(wrt = ('a'))
     print 'arguments:', d.list_arguments()
     print 'outputs:', d.list_outputs()    
-    ex = d.bind(ctx = mx.cpu(),
-                args = {c.name+'_0_grad': mx.nd.ones([3,4]),
-                        'a': mx.nd.ones([3,4])*2,
-                        'b': mx.nd.ones([3,4])*3}
-            )
+    ex = d.bind(
+        ctx = mx.cpu(),
+        args = {c.name+'_0_grad': mx.nd.ones([3,4]),
+                'a': mx.nd.ones([3,4])*2,
+                'b': mx.nd.ones([3,4])*3}
+    )
     ex.forward()
     print 'output:\n', ex.outputs[0].asnumpy()
 
 #auto_differention()
+
+def t_bind_evaluate():
+    lis = []
+    for i in xrange(2):
+        a = mx.symbol.Variable("A%d" % i)
+        a = mx.sym.Reshape(data = a, shape = (-2,1))
+        a = mx.sym.transpose(data = a, axes = (2,0,1))
+        lis.append(a)
+    concat = mx.sym.Concat(*lis, dim = 0)
+    l = mx.sym.Variable('l')
+    c = mx.symbol.SequenceLast(
+        data = concat,
+        sequence_length = l,
+        use_sequence_length = True
+
+    )
+    # allocate space for inputs
+    input_arguments = {}
+    input_arguments['A0'] = mx.nd.ones((2,3), ctx=mx.cpu())
+    input_arguments['A1'] = mx.nd.ones((2,3), ctx=mx.cpu())
+    input_arguments['l'] = mx.nd.ones((2,), ctx=mx.cpu())
+    ex = c.bind(
+        ctx = mx.cpu(),
+        args = input_arguments,
+        grad_req = 'write'
+    )
+    ex.arg_dict['A0'][:] = np.random.rand(2,3)
+    ex.arg_dict['A1'][:] = np.random.rand(2,3)
+    ex.arg_dict['l'][:] = np.array([2,2])
+    ex.forward()
+    print ex.arg_dict['A0'].asnumpy()
+    print ex.arg_dict['A1'].asnumpy()
+    print 'number of outputs = %d, first output = \n %s' % \
+    (len(ex.outputs), ex.outputs[0].asnumpy())
+
+t_bind_evaluate()

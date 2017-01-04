@@ -32,17 +32,18 @@ def model_training():
     mlp = get_mlp()
     train_iter, test_iter = get_mnist_iterator()
     model = mx.model.FeedForward(
-                    ctx = mx.gpu(0),
-                    symbol = mlp,
-                    num_epoch = 10,
-                    learning_rate = 0.1,
-                    momentum = 0.9,
-                    wd = 0.00001
-            )    
+        ctx = mx.gpu(0),
+        symbol = mlp,
+        num_epoch = 10,
+        learning_rate = 0.1,
+        momentum = 0.9,
+        wd = 0.00001
+    )    
     model.fit(
         X = train_iter,
         eval_data = test_iter,
-        batch_end_callback = mx.callback.Speedometer(batch_size, 100))
+        batch_end_callback = mx.callback.Speedometer(batch_size, 100)
+    )
 
 def model_training_with_debugging():
     def norm_stat(d):
@@ -51,31 +52,35 @@ def model_training_with_debugging():
         interval = 100,
         stat_func = norm_stat,
         pattern = '.*weight',
-        sort = True)
+        sort = True
+    )
     mlp = get_mlp()
     train_iter, test_iter = get_mnist_iterator()
     model = mx.model.FeedForward(
-                    ctx = mx.gpu(0),
-                    symbol = mlp,
-                    num_epoch = 10,
-                    learning_rate = 0.1,
-                    momentum = 0.9,
-                    wd = 0.00001
-            )    
+        ctx = mx.gpu(0),
+        symbol = mlp,
+        num_epoch = 10,
+        learning_rate = 0.1,
+        momentum = 0.9,
+        wd = 0.00001
+    )    
     model.fit(
         X = train_iter,
         eval_data = test_iter,
         monitor = mon,
-        batch_end_callback = mx.callback.Speedometer(batch_size, 100))
+        batch_end_callback = mx.callback.Speedometer(batch_size, 100)
+    )
 
 def semi_customized_training():
     mlp = get_mlp()
     train_iter, test_iter = get_mnist_iterator()
     input_shapes = {'data':(batch_size, 28*28),'softmax_label':(batch_size, )}
     # executor, train executor which needs grad, attention on 'grad_req' 
-    executor = mlp.simple_bind(ctx = mx.gpu(0),
-                            grad_req = 'write',
-                            **input_shapes)
+    executor = mlp.simple_bind(
+        ctx = mx.gpu(0),
+        grad_req = 'write',
+        **input_shapes
+    )
     arg_arrays = dict(zip(mlp.list_arguments(), executor.arg_arrays))
     # initialization
     init = mx.init.Uniform(scale = 0.01)
@@ -84,11 +89,11 @@ def semi_customized_training():
             init(name, arr)
     # optimizer definition
     opt = mx.optimizer.SGD(
-            learning_rate = 0.1,
-            momentum = 0.9,
-            wd = 0.00001,
-            rescale_grad = 1.0/batch_size
-        )
+        learning_rate = 0.1,
+        momentum = 0.9,
+        wd = 0.00001,
+        rescale_grad = 1.0/batch_size
+    )
     updater = mx.optimizer.get_updater(opt)
     # metric definition
     metric = mx.metric.Accuracy()
