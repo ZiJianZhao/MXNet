@@ -6,7 +6,7 @@ import codecs
 
 sys.path.append("..")
 from lstm import lstm_unroll
-from text_io import read_dict, get_text_char_id
+from text_io import read_char_dict, get_text_char_id
 from sequence_iter import SequenceIter, DummyIter
 
 def init_logging(log_filename = 'LOG'):
@@ -30,7 +30,7 @@ init_logging()
 
 # ----------------- 1. Process the data  ---------------------------------------
 
-word2idx = read_dict('../../data/obama/vocab.txt')
+word2idx = read_char_dict('../../data/obama/vocab.txt')
 ignore_label = word2idx.get('<PAD>')
 
 data_train, label_train = get_text_char_id('../../data/obama/obama_train.txt', word2idx)
@@ -137,6 +137,6 @@ model.fit(
 	X = train_iter,
 	eval_data = valid_iter,
 	eval_metric = mx.metric.np(perplexity),
-	batch_end_callback = [mx.callback.Speedometer(batch_size, frequent = 100)],
+	batch_end_callback = [mx.callback.Speedometer(batch_size, frequent = 10)],
 	epoch_end_callback = [mx.callback.do_checkpoint('%s/%s' % (params_dir, params_prefix), 1)]
 )

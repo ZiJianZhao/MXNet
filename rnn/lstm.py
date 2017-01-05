@@ -53,7 +53,7 @@ def lstm(num_hidden, indata, mask, prev_state,
 
 def lstm_unroll(num_lstm_layer, seq_len, input_size,
         num_hidden, num_embed, num_label,
-        ignore_label, dropout = 0.):
+        ignore_label, dropout = 0., train = False):
 
     # define weight variable and initial states
     embed_weight = mx.sym.Variable("embed_weight")
@@ -150,7 +150,6 @@ def lstm_unroll(num_lstm_layer, seq_len, input_size,
         use_ignore = True,
         name = 'softmax'
     )
-
     return sm
 
 
