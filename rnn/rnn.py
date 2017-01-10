@@ -40,6 +40,7 @@ class RNN(object):
     def __init__(self, data, mask=None, mode='lstm', seq_len=10, real_seq_len=None, 
                  num_layers=1, num_hidden=512, bi_directional=False, states=None, 
                  cells=None, dropout=0., name='rnn'):
+
         """ Initialization, define all need parameters and variables"""
         self.data = data
         self.mask = mask
@@ -363,7 +364,7 @@ class RNN(object):
                 data = self.mask, 
                 num_outputs = self.seq_len, 
                 axis = 1,
-                squeeze_axis = 1
+                squeeze_axis = True
             )
         # unrolled lstm
         last_layer_hidden_all = []
@@ -401,11 +402,11 @@ class RNN(object):
         last_time_hidden_all = []
         for i in range(self.num_layers):
             last_h = self.get_variable_length_last_symbol(
-                symbol_list = hidden_all, 
+                symbol_list = hidden_all[i], 
                 length_symbol = self.real_seq_len
             )
             last_c = self.get_variable_length_last_symbol(
-                symbol_list = candidates_all, 
+                symbol_list = candidates_all[i], 
                 length_symbol = self.real_seq_len
             )
             last_time_hidden_all.append(last_h)
@@ -465,7 +466,7 @@ class RNN(object):
         last_time_hidden_all = []
         for i in range(self.num_layers):
             last_h = self.get_variable_length_last_symbol(
-                symbol_list = hidden_all, 
+                symbol_list = hidden_all[i], 
                 length_symbol = self.real_seq_len
             )
             last_time_hidden_all.append(last_h)
@@ -560,11 +561,11 @@ class RNN(object):
         last_time_hidden_all = []
         for i in range(self.num_layers):
             last_h = self.get_variable_length_last_symbol(
-                symbol_list = forward_hidden_all, 
+                symbol_list = forward_hidden_all[i], 
                 length_symbol = self.real_seq_len
             )
             last_c = self.get_variable_length_last_symbol(
-                symbol_list = forward_candidates_all, 
+                symbol_list = forward_candidates_all[i], 
                 length_symbol = self.real_seq_len
             )
             last_time_hidden_all.append(last_h)
@@ -660,7 +661,7 @@ class RNN(object):
         last_time_hidden_all = []
         for i in range(self.num_layers):
             last_h = self.get_variable_length_last_symbol(
-                symbol_list = forward_hidden_all, 
+                symbol_list = forward_hidden_all[i], 
                 length_symbol = self.real_seq_len
             )
             last_time_hidden_all.append(last_h)        
