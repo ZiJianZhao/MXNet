@@ -5,11 +5,11 @@ import re, os, sys, argparse, logging,collections
 import codecs
 
 sys.path.append("..")
-from lstm import lstm_unroll
-from text_io import read_char_dict, get_text_char_id
+from rnn_unroll import rnn_unroll
+from text_io import read_dict, get_text_id
 from sequence_iter import SequenceIter, DummyIter
 
-def init_logging(log_filename = 'LOG'):
+def init_logging(log_filename = 'Log'):
     logging.basicConfig(
         level    = logging.DEBUG,
         format   = '%(filename)-20s LINE %(lineno)-4d %(levelname)-8s %(asctime)s %(message)s',
@@ -29,12 +29,18 @@ def init_logging(log_filename = 'LOG'):
 init_logging()
 
 # ----------------- 1. Process the data  ---------------------------------------
+data_dir = '/slfs1/users/zjz17/github/data/ptb_data/'
+vocab_path = os.path.join(data_dir, 'ptb.vocab.txt')
+train_path = os.path.join(data_dir, 'ptb.train.txt')
+valid_path = os.path.join(data_dir, 'ptb.valid.txt')
+test_path = os.path.join(data_dir, 'ptb.test.txt')
 
-word2idx = read_char_dict('../../data/obama/vocab.txt')
-ignore_label = word2idx.get('<PAD>')
+word2idx = read_dict(vocab_path)
+ignore_label = word2idx.get('<pad>')
 
-data_train, label_train = get_text_char_id('../../data/obama/obama_train.txt', word2idx)
-data_valid, label_valid = get_text_char_id('../../data/obama/obama_valid.txt', word2idx)
+data_train, label_train = get_text_id(train_path, word2idx)
+data_valid, label_valid = get_text_id(valid_path, word2idx)
+
 # -----------------2. Params Defination ----------------------------------------
 num_buckets = 1
 batch_size = 32
@@ -49,8 +55,8 @@ num_embed = 512
 num_hidden = 1024
 num_label = len(word2idx)
 
-init_h = [('l%d_init_h' % i, (batch_size, num_hidden)) for i in range(num_lstm_layer)]
-init_c = [('l%d_init_c' % i, (batch_size, num_hidden)) for i in range(num_lstm_layer)]
+init_h = [('ptb_l%d_init_h' % i, (batch_size, num_hidden)) for i in range(num_lstm_layer)]
+init_c = [('ptb_l%d_init_c' % i, (batch_size, num_hidden)) for i in range(num_lstm_layer)]
 init_states = init_h + init_c 
 # training parameters
 params_dir = 'params'
@@ -64,7 +70,7 @@ np.random.seed(seed)
 train_iter = SequenceIter(
 	data = data_train, 
 	label = label_train, 
-	pad = word2idx.get('<PAD>'),
+	pad = word2idx.get('<pad>'),
 	init_states = init_states,
 	batch_size = batch_size,
 	num_buckets = num_buckets,
@@ -72,7 +78,7 @@ train_iter = SequenceIter(
 valid_iter = SequenceIter(
 	data = data_valid, 
 	label = label_valid, 
-	pad = word2idx.get('<PAD>'),
+	pad = word2idx.get('<pad>'),
 	init_states = init_states,
 	batch_size = batch_size,
 	num_buckets = num_buckets,
@@ -99,21 +105,24 @@ if os.path.isfile('%s/%s-symbol.json' % (params_dir, params_prefix)):
 
 # -----------------------5. Training ------------------------------------
 def gen_sym(bucketkey):
-	return lstm_unroll(
-        num_lstm_layer = num_lstm_layer,
+	return rnn_unroll(
+        num_layers = num_lstm_layer,
 		seq_len = bucketkey,
 		input_size = input_size,
 		num_hidden = num_hidden,
 		num_embed = num_embed,
 		num_label = num_label,
 		ignore_label = ignore_label,
-		dropout = 0.
+        mode = 'lstm', 
+        bi_directional = False,
+        dropout = 0., 
+        train = True
 	)
 
 model = mx.model.FeedForward(
 	ctx = [mx.context.gpu(i) for i in range(1)],
 	symbol = gen_sym,
-	num_epoch = 70,
+	num_epoch = 10,
 	optimizer = 'Adam',
 	wd = 0.,
 	initializer   = mx.init.Uniform(0.05),
@@ -128,7 +137,7 @@ def perplexity(label, pred):
 	loss = 0.
 	num = 0.
 	for i in range(pred.shape[0]):
-		if int(label[i]) != ignore_label:
+		if int(label[i]) != ignore_label and int(label[i]) <= 10000:
 			num += 1
 			loss += -np.log(max(1e-10, pred[i][int(label[i])]))
 	return np.exp(loss / num)
@@ -137,6 +146,6 @@ model.fit(
 	X = train_iter,
 	eval_data = valid_iter,
 	eval_metric = mx.metric.np(perplexity),
-	batch_end_callback = [mx.callback.Speedometer(batch_size, frequent = 10)],
+	batch_end_callback = [mx.callback.Speedometer(batch_size, frequent = 100)],
 	epoch_end_callback = [mx.callback.do_checkpoint('%s/%s' % (params_dir, params_prefix), 1)]
 )

@@ -1,7 +1,20 @@
 import re, os, sys, argparse, logging, collections
 import codecs
 
-DEBUG = False
+class DataGeneration(object):
+
+    def __init__(self):
+        pass
+
+    def generate_sort_pairs(self):
+        pass
+
+    def generate_sort_pairs_with_digits_sum(self):
+        pass
+
+    def generate_sort_pairs_with_same_digits_sum(self):
+        pass
+    
 
 # -------------------------- build dict ---------------------------------------------------- 
 def read_dict(path):

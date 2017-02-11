@@ -673,31 +673,14 @@ class RNN(object):
         outputs['last_time'] = last_time_hidden_all
         return outputs 
 
-def rnn_symbol(data, mask=None, mode='lstm', seq_len=10, real_seq_len=None, 
-               num_layers=1, num_hidden=512, bi_directional=False, states=None, 
-               cells=None, dropout=0., name='rnn'):
-    """Wrap function of rnn symbol"""
-    rnn = RNN(
-        data = data, 
-        mask = mask, 
-        mode = mode, 
-        seq_len = seq_len, 
-        real_seq_len = real_seq_len, 
-        num_layers = num_layers, 
-        num_hidden = num_hidden, 
-        bi_directional = bi_directional, 
-        states = states, 
-        cells = cells, 
-        dropout = dropout, 
-        name = name
-    )
-    if mode == 'lstm' and not bi_directional:
-        return rnn.lstm_unroll()
-    elif mode == 'gru' and not bi_directional:
-        return rnn.gru_unroll()
-    elif mode == 'lstm' and bi_directional:
-        return rnn.bi_lstm_unroll()
-    elif mode == 'gru' and bi_directional:
-        return rnn.bi_gru_unroll()
-    else:
-        raise Exception("Invalid parameters")
+    def get_outputs(self):
+        if self.mode == 'lstm' and not self.bi_directional:
+            return self.lstm_unroll()
+        elif self.mode == 'gru' and not self.bi_directional:
+            return self.gru_unroll()
+        elif self.mode == 'lstm' and self.bi_directional:
+            return self.bi_lstm_unroll()
+        elif self.mode == 'gru' and self.bi_directional:
+            return self.bi_gru_unroll()
+        else:
+            raise Exception("Invalid parameters")

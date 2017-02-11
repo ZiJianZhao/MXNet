@@ -3,7 +3,7 @@ import sys
 import mxnet as mx
 
 sys.path.append("..")
-from lstm import *
+from rnn_unroll import rnn_unroll
 
 def lstm_inference_symbol(num_lstm_layer, input_size, 
     num_hidden, num_embed, num_label, dropout=0.):
@@ -80,19 +80,24 @@ class LSTMInferenceModel(object):
     def __init__(self, num_lstm_layer, input_size,
             num_hidden, num_embed, num_label,
             arg_params, ctx=mx.cpu(), dropout=0.):
-        self.sym = lstm_inference_symbol(
-            num_lstm_layer = num_lstm_layer,
+        self.sym = rnn_unroll(
+            num_layers = num_lstm_layer,
+            seq_len = 1,
             input_size = input_size,
             num_hidden = num_hidden,
             num_embed = num_embed,
             num_label = num_label,
-            dropout = dropout
+            ignore_label = -1,
+            mode = 'lstm', 
+            bi_directional = False,
+            dropout = 0., 
+            train = False
         )
         batch_size = 1
-        init_c = [('l%d_init_c'%l, (batch_size, num_hidden)) for l in range(num_lstm_layer)]
-        init_h = [('l%d_init_h'%l, (batch_size, num_hidden)) for l in range(num_lstm_layer)]
+        init_c = [('ptb_l%d_init_c'%l, (batch_size, num_hidden)) for l in range(num_lstm_layer)]
+        init_h = [('ptb_l%d_init_h'%l, (batch_size, num_hidden)) for l in range(num_lstm_layer)]
         
-        data_shape = [("data", (batch_size, )), ("mask", (batch_size, ))]
+        data_shape = [("data", (batch_size, 1)), ("mask", (batch_size, 1))]
 
         input_shapes = dict(init_c + init_h + data_shape)
         self.executor = self.sym.simple_bind(ctx=mx.cpu(), **input_shapes)
@@ -104,8 +109,8 @@ class LSTMInferenceModel(object):
    
         state_name = []
         for i in range(num_lstm_layer):
-            state_name.append("l%d_init_c" % i)
-            state_name.append("l%d_init_h" % i)
+            state_name.append("ptb_l%d_init_h" % i)
+            state_name.append("ptb_l%d_init_c" % i)
 
         self.states_dict = dict(zip(state_name, self.executor.outputs[1:]))
         self.input_arr = mx.nd.zeros(data_shape[0][1])

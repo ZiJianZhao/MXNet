@@ -3,7 +3,7 @@ import sys
 import mxnet as mx
 
 sys.path.append('..')
-from rnn.rnn import rnn_symbol
+from rnn.rnn import RNN
 
 class Seq2Seq():
 
@@ -59,7 +59,7 @@ class Seq2Seq():
             name = '%s_embed' % name
         )
         
-        rnn_outputs = rnn_symbol(
+        rnn_outputs = RNN(
             data = enc_embed, 
             mask = enc_mask, 
             mode = mode, 
@@ -72,7 +72,7 @@ class Seq2Seq():
             cells = None, 
             dropout = enc_dropout, 
             name = name
-        )
+        ).get_outputs()
         
         self.encoder_last_layer_hiddens = rnn_outputs['last_layer']
         self.encoder_last_time = rnn_outputs['last_time']
@@ -108,7 +108,7 @@ class Seq2Seq():
             name = '%s_embed' % name
         )
 
-        rnn_outputs = rnn_symbol(
+        rnn_outputs = RNN(
             data = dec_embed, 
             mask = dec_mask, 
             mode = mode, 
@@ -121,7 +121,7 @@ class Seq2Seq():
             cells = self.encoder_last_time_cells, 
             dropout = dec_dropout, 
             name = name
-        )
+        ).get_outputs()
 
         dec_hidden_all = rnn_outputs['last_layer']
         hidden_concat = mx.sym.Concat(*dec_hidden_all, dim = 0)
