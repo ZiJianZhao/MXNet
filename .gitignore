@@ -1,8 +1,12 @@
-data
-params
+*data
+*params
 example
 .ipynb_checkpoints
 
 *.txt
 *.pyc
 *.zip
+*.sh
+ERR
+LOG
+*Log

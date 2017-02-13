@@ -357,14 +357,16 @@ class RNN(object):
             data = self.data,
             num_outputs = self.seq_len,
             axis = 1,
-            squeeze_axis = True
+            squeeze_axis = True,
+            name = '%s_embed_slice_channel' % self.name
         )
         if self.mask is not None:
             maskvec = mx.sym.SliceChannel(
                 data = self.mask, 
                 num_outputs = self.seq_len, 
                 axis = 1,
-                squeeze_axis = True
+                squeeze_axis = True,
+                name = '%s_mask_slice_channel' % self.name
             )
         # unrolled lstm
         last_layer_hidden_all = []
@@ -423,14 +425,16 @@ class RNN(object):
             data = self.data,
             num_outputs = self.seq_len,
             axis = 1,
-            squeeze_axis = True
+            squeeze_axis = True,
+            name = '%s_embed_slice_channel' % self.name
         )
         if self.mask is not None:
             maskvec = mx.sym.SliceChannel(
                 data = self.mask, 
                 num_outputs = self.seq_len, 
                 axis = 1,
-                squeeze_axis = 1
+                squeeze_axis = True,
+                name = '%s_mask_slice_channel' % self.name
             )
         # unrolled lstm
         last_layer_hidden_all = []
@@ -482,14 +486,16 @@ class RNN(object):
             data = self.data,
             num_outputs = self.seq_len,
             axis = 1,
-            squeeze_axis = True
+            squeeze_axis = True,
+            name = '%s_embed_slice_channel' % self.name
         )
         if self.mask is not None:
             maskvec = mx.sym.SliceChannel(
                 data = self.mask, 
                 num_outputs = self.seq_len, 
                 axis = 1,
-                squeeze_axis = 1
+                squeeze_axis = True,
+                name = '%s_mask_slice_channel' % self.name
             )
         # unrolled lstm
         forward_last_layer_hidden_all = []
@@ -586,14 +592,16 @@ class RNN(object):
             data = self.data,
             num_outputs = self.seq_len,
             axis = 1,
-            squeeze_axis = True
+            squeeze_axis = True,
+            name = '%s_embed_slice_channel' % self.name
         )
         if self.mask is not None:
             maskvec = mx.sym.SliceChannel(
                 data = self.mask, 
                 num_outputs = self.seq_len, 
                 axis = 1,
-                squeeze_axis = 1
+                squeeze_axis = True,
+                name = '%s_mask_slice_channel' % self.name
             )
         # unrolled lstm
         forward_last_layer_hidden_all = []

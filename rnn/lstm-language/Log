@@ -125,3 +125,47 @@ callback.py          LINE 94   INFO     02-11 11:30:11 Epoch[7] Batch [400]	Spee
 callback.py          LINE 94   INFO     02-11 11:30:33 Epoch[7] Batch [500]	Speed: 141.13 samples/sec	Train-perplexity=10.430909
 callback.py          LINE 94   INFO     02-11 11:30:56 Epoch[7] Batch [600]	Speed: 141.30 samples/sec	Train-perplexity=10.285958
 callback.py          LINE 94   INFO     02-11 11:31:19 Epoch[7] Batch [700]	Speed: 141.36 samples/sec	Train-perplexity=10.102303
+callback.py          LINE 94   INFO     02-11 11:31:41 Epoch[7] Batch [800]	Speed: 141.34 samples/sec	Train-perplexity=9.799534
+callback.py          LINE 94   INFO     02-11 11:32:04 Epoch[7] Batch [900]	Speed: 141.32 samples/sec	Train-perplexity=9.480750
+callback.py          LINE 94   INFO     02-11 11:32:27 Epoch[7] Batch [1000]	Speed: 141.24 samples/sec	Train-perplexity=9.294314
+callback.py          LINE 94   INFO     02-11 11:32:49 Epoch[7] Batch [1100]	Speed: 141.24 samples/sec	Train-perplexity=9.262127
+callback.py          LINE 94   INFO     02-11 11:33:12 Epoch[7] Batch [1200]	Speed: 140.88 samples/sec	Train-perplexity=9.511333
+callback.py          LINE 94   INFO     02-11 11:33:35 Epoch[7] Batch [1300]	Speed: 141.17 samples/sec	Train-perplexity=8.726023
+model.py             LINE 276  INFO     02-11 11:33:38 Epoch[7] Resetting Data Iterator
+model.py             LINE 284  INFO     02-11 11:33:38 Epoch[7] Time cost=297.505
+model.py             LINE 345  INFO     02-11 11:33:40 Saved checkpoint to "params/obama-0008.params"
+callback.py          LINE 136  INFO     02-11 11:33:49 Epoch[7] Validation-perplexity=244.502560
+callback.py          LINE 94   INFO     02-11 11:34:12 Epoch[8] Batch [100]	Speed: 142.75 samples/sec	Train-perplexity=9.174931
+callback.py          LINE 94   INFO     02-11 11:34:34 Epoch[8] Batch [200]	Speed: 141.64 samples/sec	Train-perplexity=9.189617
+callback.py          LINE 94   INFO     02-11 11:34:57 Epoch[8] Batch [300]	Speed: 141.31 samples/sec	Train-perplexity=8.537487
+callback.py          LINE 94   INFO     02-11 11:35:20 Epoch[8] Batch [400]	Speed: 141.30 samples/sec	Train-perplexity=8.359546
+callback.py          LINE 94   INFO     02-11 11:35:42 Epoch[8] Batch [500]	Speed: 141.29 samples/sec	Train-perplexity=8.295798
+callback.py          LINE 94   INFO     02-11 11:36:05 Epoch[8] Batch [600]	Speed: 141.18 samples/sec	Train-perplexity=8.174608
+callback.py          LINE 94   INFO     02-11 11:36:28 Epoch[8] Batch [700]	Speed: 141.02 samples/sec	Train-perplexity=8.026255
+callback.py          LINE 94   INFO     02-11 11:36:50 Epoch[8] Batch [800]	Speed: 140.92 samples/sec	Train-perplexity=7.881083
+callback.py          LINE 94   INFO     02-11 11:37:13 Epoch[8] Batch [900]	Speed: 140.83 samples/sec	Train-perplexity=7.640557
+callback.py          LINE 94   INFO     02-11 11:37:36 Epoch[8] Batch [1000]	Speed: 141.14 samples/sec	Train-perplexity=7.575705
+callback.py          LINE 94   INFO     02-11 11:37:58 Epoch[8] Batch [1100]	Speed: 141.22 samples/sec	Train-perplexity=7.527694
+callback.py          LINE 94   INFO     02-11 11:38:21 Epoch[8] Batch [1200]	Speed: 141.29 samples/sec	Train-perplexity=7.678598
+callback.py          LINE 94   INFO     02-11 11:38:44 Epoch[8] Batch [1300]	Speed: 141.24 samples/sec	Train-perplexity=7.153539
+model.py             LINE 276  INFO     02-11 11:38:47 Epoch[8] Resetting Data Iterator
+model.py             LINE 284  INFO     02-11 11:38:47 Epoch[8] Time cost=297.657
+model.py             LINE 345  INFO     02-11 11:38:49 Saved checkpoint to "params/obama-0009.params"
+callback.py          LINE 136  INFO     02-11 11:38:58 Epoch[8] Validation-perplexity=286.826930
+callback.py          LINE 94   INFO     02-11 11:39:21 Epoch[9] Batch [100]	Speed: 142.99 samples/sec	Train-perplexity=7.439608
+callback.py          LINE 94   INFO     02-11 11:39:43 Epoch[9] Batch [200]	Speed: 141.49 samples/sec	Train-perplexity=7.602540
+callback.py          LINE 94   INFO     02-11 11:40:06 Epoch[9] Batch [300]	Speed: 141.29 samples/sec	Train-perplexity=7.105948
+callback.py          LINE 94   INFO     02-11 11:40:29 Epoch[9] Batch [400]	Speed: 141.32 samples/sec	Train-perplexity=6.917603
+callback.py          LINE 94   INFO     02-11 11:40:51 Epoch[9] Batch [500]	Speed: 141.16 samples/sec	Train-perplexity=6.922908
+callback.py          LINE 94   INFO     02-11 11:41:14 Epoch[9] Batch [600]	Speed: 141.23 samples/sec	Train-perplexity=6.860513
+callback.py          LINE 94   INFO     02-11 11:41:37 Epoch[9] Batch [700]	Speed: 141.17 samples/sec	Train-perplexity=6.711312
+callback.py          LINE 94   INFO     02-11 11:41:59 Epoch[9] Batch [800]	Speed: 141.03 samples/sec	Train-perplexity=6.665288
+callback.py          LINE 94   INFO     02-11 11:42:22 Epoch[9] Batch [900]	Speed: 141.15 samples/sec	Train-perplexity=6.482385
+callback.py          LINE 94   INFO     02-11 11:42:45 Epoch[9] Batch [1000]	Speed: 141.40 samples/sec	Train-perplexity=6.428992
+callback.py          LINE 94   INFO     02-11 11:43:07 Epoch[9] Batch [1100]	Speed: 141.39 samples/sec	Train-perplexity=6.466580
+callback.py          LINE 94   INFO     02-11 11:43:30 Epoch[9] Batch [1200]	Speed: 141.29 samples/sec	Train-perplexity=6.468820
+callback.py          LINE 94   INFO     02-11 11:43:52 Epoch[9] Batch [1300]	Speed: 140.98 samples/sec	Train-perplexity=6.133365
+model.py             LINE 276  INFO     02-11 11:43:56 Epoch[9] Resetting Data Iterator
+model.py             LINE 284  INFO     02-11 11:43:56 Epoch[9] Time cost=297.554
+model.py             LINE 345  INFO     02-11 11:43:57 Saved checkpoint to "params/obama-0010.params"
+callback.py          LINE 136  INFO     02-11 11:44:07 Epoch[9] Validation-perplexity=334.640600
