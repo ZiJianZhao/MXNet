@@ -1,0 +1,4 @@
+02-13 14:49:17 PM Start training with [gpu(0)]
+02-13 14:49:19 PM Epoch[0] Batch [63]	Speed: 1420.52 samples/sec	Train-customized_metric=0.164517
+02-13 14:49:20 PM Epoch[0] Batch [126]	Speed: 1401.13 samples/sec	Train-customized_metric=0.167163
+02-13 14:49:21 PM Epoch[0] Batch [189]	Speed: 1361.56 samples/sec	Train-customized_metric=0.167659

@@ -41,7 +41,6 @@ class DummyIter(mx.io.DataIter):
 
         for batch in real_iter:
             self.the_batch = batch
-            print "dog"
             break
 
     def __iter__(self):
@@ -52,7 +51,7 @@ class DummyIter(mx.io.DataIter):
 
 
 class EncoderDecoderIter(mx.io.DataIter):
-    def __init__(self, enc_data, dec_data, pad, eos,  init_states, 
+    def __init__(self, enc_data, dec_data, pad, eos, init_states,
                 batch_size = 20, num_buckets = 5,
                 DEBUG = False):
         # Initialization
@@ -123,6 +122,7 @@ class EncoderDecoderIter(mx.io.DataIter):
         self.init_state_arrays = [mx.nd.zeros(x[1]) for x in self.init_states]
         enc_dec_bucket_key = self.default_bucket_key
         self.provide_data = [('enc_data' , (self.batch_size, enc_dec_bucket_key.enc_len)),
+                    #('enc_info' , (self.batch_size, enc_dec_bucket_key.enc_len)),
                     ('enc_mask' , (self.batch_size, enc_dec_bucket_key.enc_len)),
                     ('dec_data' , (self.batch_size, enc_dec_bucket_key.dec_len)),
                     ('dec_mask' , (self.batch_size, enc_dec_bucket_key.dec_len)),] + self.init_states
@@ -148,9 +148,16 @@ class EncoderDecoderIter(mx.io.DataIter):
             dec_data[:] = self.dec_data[i_bucket][idx]
             dec_mask[:] = self.dec_mask[i_bucket][idx]      
             label[:] = self.label[i_bucket][idx]
+            '''enc_info = np.zeros(enc_data.shape)
+            for i in range(0,enc_data.shape[0]):
+                for j in range(0,enc_data.shape[1]):
+                    enc_info[i,j] = sum(map(int, str(int(enc_data[i,j])-3)))'''
 
+            #data_all = [mx.nd.array(enc_data), mx.nd.array(enc_info), mx.nd.array(enc_mask),mx.nd.array(dec_data), mx.nd.array(dec_mask) ]   + self.init_state_arrays
             data_all = [mx.nd.array(enc_data), mx.nd.array(enc_mask),mx.nd.array(dec_data), mx.nd.array(dec_mask) ]   + self.init_state_arrays
             label_all = [mx.nd.array(label)]
+            
+            #data_names = ['enc_data',''' 'enc_info',''' 'enc_mask', 'dec_data', 'dec_mask'] + init_state_names
             data_names = ['enc_data', 'enc_mask', 'dec_data', 'dec_mask'] + init_state_names
             label_names = ['label']
 
