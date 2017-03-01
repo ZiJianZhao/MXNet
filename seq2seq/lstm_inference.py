@@ -57,7 +57,8 @@ class BeamSearch(Seq2Seq):
         enc_data_shape = [("enc_data", (batch_size, enc_len))]
         enc_mask_shape = [("enc_mask", (batch_size, enc_len))]
         enc_info_shape = [("enc_info", (batch_size, enc_len))]
-        enc_input_shapes = dict(init_c + init_h + enc_data_shape + enc_mask_shape + enc_info_shape)
+        #enc_input_shapes = dict(init_c + init_h + enc_data_shape + enc_mask_shape + enc_info_shape)
+        enc_input_shapes = dict(init_c + init_h + enc_data_shape + enc_mask_shape)
         # bind the network and provide the pretrained parameters
         self.encoder_executor = self.encoder_symbol.simple_bind(ctx = ctx, **enc_input_shapes)
         for key in self.encoder_executor.arg_dict.keys():
@@ -66,12 +67,11 @@ class BeamSearch(Seq2Seq):
         # provide the input data and forward the network
         enc_data.copyto(self.encoder_executor.arg_dict["enc_data"])
         enc_mask.copyto(self.encoder_executor.arg_dict["enc_mask"])
-        enc_info  = mx.nd.zeros((1, enc_len))
+        '''enc_info  = mx.nd.zeros((1, enc_len))
         for i in range(enc_len):
-            print int(enc_data.asnumpy()[0,i])
-            enc_info[0,i] = sum(map(int, str(int(enc_data.asnumpy()[0,i])-3)))
-        enc_info.copyto(self.encoder_executor.arg_dict["enc_info"])
-        print 'enc_info', enc_info.asnumpy()
+            enc_info[0,i] = sum(map(int, str(int(enc_data.asnumpy()[0,i])-3)))'''
+        #enc_info.copyto(self.encoder_executor.arg_dict["enc_info"])
+        
         self.encoder_executor.forward()
 
         # get the encoded vector for decoder hidden state initialization

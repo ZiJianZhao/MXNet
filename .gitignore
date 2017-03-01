@@ -2,7 +2,9 @@
 *params
 example
 .ipynb_checkpoints
-
+*.jpg
+*.png
+*.PNG
 *.txt
 *.pyc
 *.zip

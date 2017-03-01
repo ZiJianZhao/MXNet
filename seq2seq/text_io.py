@@ -24,7 +24,8 @@ class DataGeneration(object):
         for _ in range(0, self.train_epoch):
             random.shuffle(lis)
             for i in range(self.length, self.high, self.length):
-                a[:] = lis[i - self.length:i]
+                leng = random.randint(1, self.length)
+                a[:] = lis[i - leng:i]
                 b = sorted(a)
                 f.write(str(a[0]))
                 for digit in a[1:]:
@@ -38,7 +39,8 @@ class DataGeneration(object):
         for _ in range(0, self.valid_epoch):
             random.shuffle(lis)
             for i in range(self.length, self.high, self.length):
-                a[:] = lis[i - self.length:i]
+                leng = random.randint(1, self.length)
+                a[:] = lis[i - leng:i]
                 b = sorted(a)
                 g.write(str(a[0]))
                 for digit in a[1:]:
@@ -141,8 +143,8 @@ class DataGeneration(object):
         g.close()
 
 if __name__ == '__main__':
-    data_gen = DataGeneration(1000, 10000, 1000, 5)
-    data_gen.generate_q3_pairs('/slfs1/users/zjz17/github/data/sort/')
+    data_gen = DataGeneration(50, 50000, 1000, 10)
+    data_gen.generate_q1_pairs('/slfs1/users/zjz17/github/data/sort/')
 
 DEBUG = False
 # -------------------------- build dict ---------------------------------------------------- 
