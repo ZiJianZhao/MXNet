@@ -9,6 +9,8 @@ sys.path.append("..")
 from read_data import mnist_load
 from basic_usage import init_logging
 
+batch_size = 64
+
 def get_mlp():  
     data = mx.symbol.Variable('data')
     label = mx.symbol.Variable('softmax_label')
@@ -19,6 +21,7 @@ def get_mlp():
     fc3 = mx.symbol.FullyConnected(data = act2, name = 'fc3', num_hidden = 10)
     mlp = mx.symbol.SoftmaxOutput(data = fc3, label = label, name = 'softmax')
     return mlp 
+
 
 def get_mnist_iterator():
     train_images, valid_images, _ = mnist_load.load_data()
@@ -32,7 +35,7 @@ def model_training():
     mlp = get_mlp()
     train_iter, test_iter = get_mnist_iterator()
     model = mx.model.FeedForward(
-        ctx = mx.gpu(0),
+        ctx = [mx.gpu(0), mx.gpu(1)],
         symbol = mlp,
         num_epoch = 10,
         learning_rate = 0.1,
@@ -179,6 +182,7 @@ def customized_training():
         print "Accuracy in valid data: ", num_correct / float(num_total)
 
 def main():
-    batch_size = 100
     init_logging()
-    customized_training()
+    model_training()
+
+main()

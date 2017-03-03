@@ -143,7 +143,7 @@ class DataGeneration(object):
         g.close()
 
 if __name__ == '__main__':
-    data_gen = DataGeneration(50, 50000, 1000, 10)
+    data_gen = DataGeneration(100, 50000, 1000, 10)
     data_gen.generate_q1_pairs('/slfs1/users/zjz17/github/data/sort/')
 
 DEBUG = False

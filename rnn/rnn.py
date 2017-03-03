@@ -14,6 +14,9 @@ class RNN(object):
         ===============================================================================================
         real_seq_len: the length of real data. a list of batch size.
         Note: this should be consistent with mask and padding. remember where you pad.
+        Note: This is one way to deal with the padding by mask the pad to zero.
+        However, there are another simpler way to keep the state unchanged when passing the padding. 
+        (In this way, we need not to use the symbol SequenceLast and the parameter is deprecated)
         ===============================================================================================
         
         ***********************************************************************************************
@@ -26,7 +29,13 @@ class RNN(object):
         ***********************************************************************************************
         
         bi_directional: True or False. 
-        
+
+        last_time_only_forward: True of False.
+        Note: if true, then the last time states of bi_directional rnn will only use the forward part;
+        else, the forward and backward part will be concat.
+        Note: it is to messy to save such a unusual parameter, I will keep the code in the bi_rnn_unroll,
+        if you would like to use it, just remove the comment around the code. Deprecated.
+
         ===============================================================================================
         hidden_size: hidden state size. (the cell size is same as hidden size for LSTM)
         states: init states symbols, can be None then you need to provide the initial states during training. 
@@ -54,16 +63,15 @@ class RNN(object):
 
     """
 
-    def __init__(self, data, mask=None, mode='lstm', seq_len=10, real_seq_len=None, 
-                 num_layers=1, num_hidden=512, bi_directional=False, states=None, 
-                 cells=None, dropout=0., name='rnn'):
+    def __init__(self, data, mask=None, mode='lstm', seq_len=10, num_layers=1, 
+                num_hidden=512, bi_directional=False,
+                states=None, cells=None, dropout=0., name='rnn'):
 
         """ Initialization, define all need parameters and variables"""
         self.data = data
         self.mask = mask
         self.mode = mode
         self.seq_len = seq_len
-        self.real_seq_len = real_seq_len
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.bi_directional = bi_directional
@@ -71,14 +79,17 @@ class RNN(object):
         self.cells = cells
         self.dropout = dropout
         self.name = name
-        
+        self.rnn = None
+
         if self.mode == 'gru':
+            self.rnn = self.gru
             self.GRUState = namedtuple("State", ["h"])
             self.GRUParam = namedtuple("Param", ["gates_i2h_weight", "gates_i2h_bias",
                                    "gates_h2h_weight", "gates_h2h_bias",
                                    "trans_i2h_weight", "trans_i2h_bias",
                                    "trans_h2h_weight", "trans_h2h_bias"])
         elif self.mode == 'lstm':
+            self.rnn = self.lstm
             self.LSTMState = namedtuple("State", ["c", "h"])
             self.LSTMParam = namedtuple("Param", ["i2h_weight", "i2h_bias", "h2h_weight", "h2h_bias"])
         else:
@@ -305,8 +316,10 @@ class RNN(object):
         next_h = out_gate * mx.sym.Activation(next_c, act_type = "tanh")
         if mask is not None:
             mask = mx.sym.Reshape(data = mask, shape = (-1, 1))
-            next_c = mx.sym.broadcast_mul(next_c, mask, name = 'c_broadcast_mul')
-            next_h = mx.sym.broadcast_mul(next_h, mask, name = 'h_broadcast_mul')
+            next_h = (mx.sym.broadcast_mul(next_h, mask, name = 'next_h_broadcast_mul') + 
+                mx.sym.broadcast_mul(prev_state.h, 1 - mask, name = 'prev_h_broadcast_mul'))
+            next_c = (mx.sym.broadcast_mul(next_c, mask, name = 'next_c_broadcast_mul') + 
+                mx.sym.broadcast_mul(prev_state.c, 1 - mask, name = 'prev_c_broadcast_mul'))
         
         return self.LSTMState(c = next_c, h = next_h)
 
@@ -357,10 +370,12 @@ class RNN(object):
         next_h = prev_state.h + update_gate * (h_trans_active - prev_state.h)
         if mask is not None:
             mask = mx.sym.Reshape(data = mask, shape = (-1, 1))
-            next_h = mx.sym.broadcast_mul(next_h, mask, name = 'h_broadcast_mul')
+            next_h = (mx.sym.broadcast_mul(next_h, mask, name = 'next_h_broadcast_mul') + 
+                mx.sym.broadcast_mul(prev_state.h, 1 - mask, name = 'prev_h_broadcast_mul'))
         
         return self.GRUState(h = next_h)
 
+    '''This function is not need any more
     def get_variable_length_last_symbol(self, symbol_list, length_symbol):
         h_list = []
         for symbol in symbol_list:
@@ -382,14 +397,61 @@ class RNN(object):
                 use_sequence_length = False,
                 name = 'SequenceLast_last_h'
             )
-        return last_h             
+        return last_h
+    '''
 
+    def rnn_unroll(self):
+        self.split_embed()
+        outputs = self.explictly_unroll( 
+            last_states = self.last_states, 
+            param_cells = self.param_cells,
+            forward = True
+        )
+        return outputs
 
-    def lstm_unroll(self):
+    def bi_rnn_unroll(self):
         """Explictly unroll rnn network"""
 
         ## maybe some problemin this symbol, attention
-        wordvec = mx.sym.SliceChannel(
+        self.split_embed()
+        forward_outputs = self.explictly_unroll(
+            last_states = self.forward_last_states, 
+            param_cells = self.forward_param_cells,
+            forward = True
+        ) 
+        backward_outputs = self.explictly_unroll(
+            last_states = self.backward_last_states, 
+            param_cells = self.backward_param_cells,
+            forward = False
+        )
+
+        outputs = {}
+        last_time_hiddens = []
+        if self.mode =='lstm':
+            last_time_cells = []
+        else:
+            last_time_cells = None
+        last_time_hiddens = forward_outputs['last_time']['hidden']
+        last_time_cells = forward_outputs['last_time']['cell']
+        ''' Remove the comment if you want both the forward and backward part.
+        for i in range(self.num_layers):
+            last_h = mx.sym.Concat(*[forward_outputs['last_time']['hidden'][i], backward_outputs['last_time']['hidden'][i]], dim=1)
+            last_time_hiddens.append(last_h)
+            if self.mode == 'lstm':
+                last_c = mx.sym.Concat(*[forward_outputs['last_time']['cell'][i], backward_outputs['last_time']['cell'][i]], dim=1)
+                last_time_cells.append(last_c)
+        '''
+        last_layer_hiddens = []
+        for i in xrange(self.seq_len):
+            temp_symbol = mx.sym.Concat(*[forward_outputs['last_layer'][i], backward_outputs['last_layer'][i]], dim=1)
+            last_layer_hiddens.append(temp_symbol)
+        outputs['last_layer'] = last_layer_hiddens
+        outputs['last_time'] = {'hidden' : last_time_hiddens, 'cell' : last_time_cells}
+        return outputs
+
+    def split_embed(self):
+        '''maybe some problem in this symbol, attention'''
+        self.wordvec = mx.sym.SliceChannel(
             data = self.data,
             num_outputs = self.seq_len,
             axis = 1,
@@ -397,343 +459,65 @@ class RNN(object):
             name = '%s_embed_slice_channel' % self.name
         )
         if self.mask is not None:
-            maskvec = mx.sym.SliceChannel(
+            self.maskvec = mx.sym.SliceChannel(
                 data = self.mask, 
                 num_outputs = self.seq_len, 
                 axis = 1,
                 squeeze_axis = True,
                 name = '%s_mask_slice_channel' % self.name
             )
-        # unrolled lstm
-        last_layer_hidden_all = []
-        hidden_all = [[] for _ in range(self.num_layers)]
-        candidates_all = [[] for _ in range(self.num_layers)]
+
+    def explictly_unroll(self, last_states, param_cells, forward = True):
+        '''if forward is True, forward in rnn; else, backward'''
+        last_layer_hiddens = []
+        last_time_hiddens = []
+        if self.mode == 'lstm':
+            last_time_cells = []
+        else:
+            last_time_cells = None
         for seqidx in xrange(self.seq_len):
-            hidden = wordvec[seqidx]
+            if forward:
+                k = seqidx
+            else:
+                k = self.seq_len - seqidx - 1
+            hidden = self.wordvec[k]
             if self.mask is None:
                 mask = None
             else:
-                mask = maskvec[seqidx]
+                mask = self.maskvec[k]
             ## stack lstm
             for i in xrange(self.num_layers):
                 if i == 0:
                     dp_ratio = 0.
                 else:
                     dp_ratio = self.dropout
-                next_state = self.lstm(
+                next_state = self.rnn(
                     num_hidden = self.num_hidden,
                     indata = hidden,
                     mask = mask,
-                    prev_state = self.last_states[i],
-                    param = self.param_cells[i],
-                    seqidx = seqidx,
+                    prev_state = last_states[i],
+                    param = param_cells[i],
+                    seqidx = k,
                     layeridx = i,
                     dropout = dp_ratio
                 )
                 hidden = next_state.h
-                self.last_states[i] = next_state
-                hidden_all[i].append(hidden)
-                candidates_all[i].append(next_state.c)
-            last_layer_hidden_all.append(hidden)
-
+                last_states[i] = next_state
+                if seqidx == self.seq_len - 1:
+                    last_time_hiddens.append(hidden)
+                    if self.mode == 'lstm':
+                        last_time_cells.append(next_state.c)
+            if forward:
+                last_layer_hiddens.append(hidden)
+            else:
+                last_layer_hiddens.insert(0, hidden)
         outputs = {}
-        last_time_hiddens = []
-        last_time_cells = []
-        for i in range(self.num_layers):
-            last_h = self.get_variable_length_last_symbol(
-                symbol_list = hidden_all[i], 
-                length_symbol = self.real_seq_len
-            )
-            last_c = self.get_variable_length_last_symbol(
-                symbol_list = candidates_all[i], 
-                length_symbol = self.real_seq_len
-            )
-            last_time_hiddens.append(last_h)
-            last_time_cells.append(last_c)
-        outputs['last_layer'] = last_layer_hidden_all
+        outputs['last_layer'] = last_layer_hiddens
         outputs['last_time'] = {'hidden': last_time_hiddens, 'cell': last_time_cells}
         return outputs
 
-    def gru_unroll(self):
-        """Explictly unroll rnn network"""
-
-        ## maybe some problem in this symbol, attention
-        wordvec = mx.sym.SliceChannel(
-            data = self.data,
-            num_outputs = self.seq_len,
-            axis = 1,
-            squeeze_axis = True,
-            name = '%s_embed_slice_channel' % self.name
-        )
-        if self.mask is not None:
-            maskvec = mx.sym.SliceChannel(
-                data = self.mask, 
-                num_outputs = self.seq_len, 
-                axis = 1,
-                squeeze_axis = True,
-                name = '%s_mask_slice_channel' % self.name
-            )
-        # unrolled lstm
-        last_layer_hidden_all = []
-        hidden_all = [[] for _ in range(self.num_layers)]
-        for seqidx in xrange(self.seq_len):
-            hidden = wordvec[seqidx]
-            if self.mask is None:
-                mask = None
-            else:
-                mask = maskvec[seqidx]
-            ## stack lstm
-            for i in xrange(self.num_layers):
-                if i == 0:
-                    dp_ratio = 0.
-                else:
-                    dp_ratio = self.dropout
-                next_state = self.gru(
-                    num_hidden = self.num_hidden,
-                    indata = hidden,
-                    mask = mask,
-                    prev_state = self.last_states[i],
-                    param = self.param_cells[i],
-                    seqidx = seqidx,
-                    layeridx = i,
-                    dropout = dp_ratio
-                )
-                hidden = next_state.h
-                self.last_states[i] = next_state
-                hidden_all[i].append(hidden)
-            last_layer_hidden_all.append(hidden)
-            #last_layer_hidden_all.append(update_gate)
-
-        outputs = {}
-        last_time_hidden_all = []
-        for i in range(self.num_layers):
-            last_h = self.get_variable_length_last_symbol(
-                symbol_list = hidden_all[i], 
-                length_symbol = self.real_seq_len
-            )
-            last_time_hidden_all.append(last_h)
-        outputs['last_layer'] = last_layer_hidden_all
-        outputs['last_time'] = {'hidden': last_time_hidden_all, 'cell': None}
-        return outputs
-
-    def bi_lstm_unroll(self):
-        """Explictly unroll rnn network"""
-
-        ## maybe some problemin this symbol, attention
-        wordvec = mx.sym.SliceChannel(
-            data = self.data,
-            num_outputs = self.seq_len,
-            axis = 1,
-            squeeze_axis = True,
-            name = '%s_embed_slice_channel' % self.name
-        )
-        if self.mask is not None:
-            maskvec = mx.sym.SliceChannel(
-                data = self.mask, 
-                num_outputs = self.seq_len, 
-                axis = 1,
-                squeeze_axis = True,
-                name = '%s_mask_slice_channel' % self.name
-            )
-        # unrolled lstm
-        forward_last_layer_hidden_all = []
-        forward_hidden_all = [[] for _ in range(self.num_layers)]
-        forward_candidates_all = [[] for _ in range(self.num_layers)]
-        
-        for seqidx in xrange(self.seq_len):
-            hidden = wordvec[seqidx]
-            if self.mask is None:
-                mask = None
-            else:
-                mask = maskvec[seqidx]
-            ## stack lstm
-            for i in xrange(self.num_layers):
-                if i == 0:
-                    dp_ratio = 0.
-                else:
-                    dp_ratio = self.dropout
-                next_state = self.lstm(
-                    num_hidden = self.num_hidden,
-                    indata = hidden,
-                    mask = mask,
-                    prev_state = self.forward_last_states[i],
-                    param = self.forward_param_cells[i],
-                    seqidx = seqidx,
-                    layeridx = i,
-                    dropout = dp_ratio
-                )
-                hidden = next_state.h
-                self.forward_last_states[i] = next_state
-                forward_hidden_all[i].append(hidden)
-                forward_candidates_all[i].append(next_state.c)
-            forward_last_layer_hidden_all.append(hidden)
-
-        backward_last_layer_hidden_all = []
-        backward_hidden_all = [[] for _ in range(self.num_layers)]
-        backward_candidates_all = [[] for _ in range(self.num_layers)]
-        
-        for seqidx in xrange(self.seq_len):
-            k = self.seq_len - seqidx - 1
-            hidden = wordvec[k]
-            if self.mask is None:
-                mask = None
-            else:
-                mask = maskvec[k]
-            ## stack lstm
-            for i in xrange(self.num_layers):
-                if i == 0:
-                    dp_ratio = 0.
-                else:
-                    dp_ratio = self.dropout
-                next_state = self.lstm(
-                    num_hidden = self.num_hidden,
-                    indata = hidden,
-                    mask = mask,
-                    prev_state = self.backward_last_states[i],
-                    param = self.backward_param_cells[i],
-                    seqidx = k,
-                    layeridx = i,
-                    dropout = dp_ratio
-                )
-                hidden = next_state.h
-                self.backward_last_states[i] = next_state
-                backward_hidden_all.insert(0, hidden)
-                backward_candidates_all.insert(0, next_state.c)
-            backward_last_layer_hidden_all.insert(0, hidden)
-
-        outputs = {}
-        last_time_hiddens = []
-        last_time_cells = []
-        for i in range(self.num_layers):
-            forward_last_h = self.get_variable_length_last_symbol(
-                symbol_list = forward_hidden_all[i], 
-                length_symbol = self.real_seq_len
-            )
-            forward_last_c = self.get_variable_length_last_symbol(
-                symbol_list = forward_candidates_all[i], 
-                length_symbol = self.real_seq_len
-            )
-            backward_last_h = backward_hidden_all[0]
-            backward_last_c = backward_candidates_all[0]
-            last_h = mx.sym.Concat(*[forward_last_h, backward_last_h], dim=1)
-            last_c = mx.sym.Concat(*[forward_last_c, backward_last_c], dim=1)
-            last_time_hiddens.append(last_h)
-            last_time_cells.append(last_c)
-        last_layer_hidden_all = []
-        for i in xrange(self.seq_len):
-            temp_symbol = mx.sym.Concat(*[forward_last_layer_hidden_all[i], backward_last_layer_hidden_all[i]], dim=1)
-            last_layer_hidden_all.append(temp_symbol)
-        outputs['last_layer'] = last_layer_hidden_all
-        outputs['last_time'] = {'hidden' : last_time_hiddens, 'cell' : last_time_cells}
-        return outputs     
-
-    def bi_gru_unroll(self):
-        """Explictly unroll rnn network"""
-
-        ## maybe some problemin this symbol, attention
-        wordvec = mx.sym.SliceChannel(
-            data = self.data,
-            num_outputs = self.seq_len,
-            axis = 1,
-            squeeze_axis = True,
-            name = '%s_embed_slice_channel' % self.name
-        )
-        if self.mask is not None:
-            maskvec = mx.sym.SliceChannel(
-                data = self.mask, 
-                num_outputs = self.seq_len, 
-                axis = 1,
-                squeeze_axis = True,
-                name = '%s_mask_slice_channel' % self.name
-            )
-        # unrolled lstm
-        forward_last_layer_hidden_all = []
-        forward_hidden_all = [[] for _ in range(self.num_layers)]
-        
-        for seqidx in xrange(self.seq_len):
-            hidden = wordvec[seqidx]
-            if self.mask is None:
-                mask = None
-            else:
-                mask = maskvec[seqidx]
-            ## stack lstm
-            for i in xrange(self.num_layers):
-                if i == 0:
-                    dp_ratio = 0.
-                else:
-                    dp_ratio = self.dropout
-                next_state = self.gru(
-                    num_hidden = self.num_hidden,
-                    indata = hidden,
-                    mask = mask,
-                    prev_state = self.forward_last_states[i],
-                    param = self.forward_param_cells[i],
-                    seqidx = seqidx,
-                    layeridx = i,
-                    dropout = dp_ratio
-                )
-                hidden = next_state.h
-                self.forward_last_states[i] = next_state
-                forward_hidden_all[i].append(hidden)
-            forward_last_layer_hidden_all.append(hidden)
-
-        backward_last_layer_hidden_all = []
-        backward_hidden_all = [[] for _ in range(self.num_layers)]
-        
-        for seqidx in xrange(self.seq_len):
-            k = self.seq_len - seqidx - 1
-            hidden = wordvec[k]
-            if self.mask is None:
-                mask = None
-            else:
-                mask = maskvec[k]
-            ## stack lstm
-            for i in xrange(self.num_layers):
-                if i == 0:
-                    dp_ratio = 0.
-                else:
-                    dp_ratio = self.dropout
-                next_state = self.gru(
-                    num_hidden = self.num_hidden,
-                    indata = hidden,
-                    mask = mask,
-                    prev_state = self.backward_last_states[i],
-                    param = self.backward_param_cells[i],
-                    seqidx = k,
-                    layeridx = i,
-                    dropout = dp_ratio
-                )
-                hidden = next_state.h
-                self.backward_last_states[i] = next_state
-                backward_hidden_all.insert(0, hidden)
-            backward_last_layer_hidden_all.insert(0, hidden)
-
-        outputs = {}
-        last_time_hidden_all = []
-        for i in range(self.num_layers):
-            forward_last_h = self.get_variable_length_last_symbol(
-                symbol_list = forward_hidden_all[i], 
-                length_symbol = self.real_seq_len
-            )
-            backward_last_h = backward_hidden_all[0]
-            last_h = mx.sym.Concat(*[forward_last_h, backward_last_h], dim=1)
-            last_time_hidden_all.append(last_h) 
-        last_layer_hidden_all = []
-        for i in xrange(self.seq_len):
-            temp_symbol = mx.sym.Concat(*[forward_last_layer_hidden_all[i], backward_last_layer_hidden_all[i]], dim=1)
-            last_layer_hidden_all.append(temp_symbol)
-        outputs['last_layer'] = last_layer_hidden_all
-        outputs['last_time'] = {'hidden' : last_time_hidden_all, 'cell' : None}
-        return outputs
-
     def get_outputs(self):
-        if self.mode == 'lstm' and not self.bi_directional:
-            return self.lstm_unroll()
-        elif self.mode == 'gru' and not self.bi_directional:
-            return self.gru_unroll()
-        elif self.mode == 'lstm' and self.bi_directional:
-            return self.bi_lstm_unroll()
-        elif self.mode == 'gru' and self.bi_directional:
-            return self.bi_gru_unroll()
-        else:
-            raise Exception("Invalid parameters")
+        if self.bi_directional:
+            return self.bi_rnn_unroll()
+        else:       
+            return self.rnn_unroll()

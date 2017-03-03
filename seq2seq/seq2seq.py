@@ -113,7 +113,6 @@ class Seq2Seq(object):
             mask = enc_mask, 
             mode = mode, 
             seq_len = enc_len, 
-            real_seq_len = None, 
             num_layers = num_layers, 
             num_hidden = num_hidden, 
             bi_directional = bi_directional, 
@@ -149,7 +148,6 @@ class Seq2Seq(object):
                 mask = dec_mask, 
                 mode = mode, 
                 seq_len = dec_len, 
-                real_seq_len = None, 
                 num_layers = num_layers, 
                 num_hidden = num_hidden, 
                 bi_directional = False, 
@@ -164,7 +162,6 @@ class Seq2Seq(object):
                 mask = dec_mask, 
                 mode = mode, 
                 seq_len = dec_len, 
-                real_seq_len = None, 
                 num_layers = num_layers, 
                 num_hidden = num_hidden, 
                 bi_directional = False, 
@@ -220,6 +217,7 @@ class BeamSearch(Seq2Seq):
         ):
         # process input encoder string
         if enc_string is None:
+            print 'Enter the encode sentence:'
             enc_string = raw_input()
         string_list = enc_string.strip().split(' ')
         enc_len = len(string_list)
@@ -320,8 +318,8 @@ class BeamSearch(Seq2Seq):
         enc_list = self.enc_data.asnumpy().reshape(-1,).tolist()
         for i in enc_list:
             input_str += " " +  self.enc_idx2word[int(i)]
-        print "input sentence: ", input_str
-        print "output sentence: ", self.dec_string
+        print "Encode Sentence: ", input_str
+        print "Decode Sentence: ", self.dec_string
         print 'Beam Search Results: '
         result_sentences = self.beam_search()
         for pair in result_sentences:
@@ -380,64 +378,3 @@ class BeamSearch(Seq2Seq):
         result = min(self.beam, len(result_sentences), 10)
         result_sentences = sorted(result_sentences, reverse = True)[:result]
         return result_sentences
-'''
-    def beam_search(self):
-        self.beam = 10
-        active_sentences = [(0,[self.eos], 0) ]
-        ended_sentences = []
-        states_list  = [self.init_states_dict]
-        min_length = 0
-        max_length = 20
-        min_count = min(self.beam, len(active_sentences))
-
-        for seqidx in xrange(max_length):
-            tmp_sentences = []
-            new_states_list = []
-            for i in xrange(min_count):
-                
-                states_dict  = states_list[active_sentences[i][2]]
-                for key in states_dict.keys():
-                    states_dict[key].copyto(self.decoder_executor.arg_dict[key])
-
-                dec_data = mx.nd.zeros((1, 1))
-                dec_mask = mx.nd.ones((1, 1))
-                tmp_data = np.zeros((1, 1))
-                tmp_data[0] = active_sentences[i][1][-1]
-                dec_data[:] = tmp_data
-                dec_data.copyto(self.decoder_executor.arg_dict["dec_data"])
-                dec_mask.copyto(self.decoder_executor.arg_dict["dec_mask"])
-                
-                self.decoder_executor.forward()
-
-                new_states_dict = dict(zip(self.state_name, self.decoder_executor.outputs[1:]))
-                tmp_states_dict = copy.deepcopy(new_states_dict)
-                new_states_list.append(tmp_states_dict)
-
-                prob = self.decoder_executor.outputs[0].asnumpy()
-                
-                # === this order is from small to big =====
-                indecies = np.argsort(prob, axis = 1)[0]
-
-                for j in xrange(self.beam):
-                    score = active_sentences[i][0] + math.log(prob[0][indecies[-j-1]])
-                    sent = active_sentences[i][1][:]
-                    sent.extend([indecies[-j-1]])
-                    if sent[-1] == self.eos:
-                        if seqidx >= min_length:
-                            ended_sentences.append((score, sent))
-                    elif sent[-1] != self.unk and sent[-1] != self.pad:
-                        tmp_sentences.append((score, sent, i))
-
-            states_list = new_states_list[:]
-            min_count = min(self.beam, len(tmp_sentences))
-            active_sentences = sorted(tmp_sentences, reverse = True)[:min_count]
-
-        result_sentences = []
-        for sent in active_sentences:
-            result_sentences.append((sent[0], sent[1]))
-        for sent in ended_sentences:
-            result_sentences.append(sent)
-        result = min(self.beam, len(result_sentences), 10)
-        result_sentences = sorted(result_sentences, reverse = True)[:result]
-        return result_sentences
-'''

@@ -3,42 +3,76 @@ import numpy as np
 
 import re, os, sys, argparse, logging,collections
 import codecs
+import math
 
-from text_io import read_dict, get_enc_dec_text_id
-from enc_dec_iter import EncoderDecoderIter, read_dict, generate_init_states_for_rnn
+from enc_dec_iter import EncoderDecoderIter, read_dict, generate_init_states_for_rnn, get_enc_dec_text_id
 from seq2seq import Seq2Seq, BeamSearch
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Encoder-Decoder Model Inference")
     parser.add_argument('--mode', default = 'train', type = str, 
-        help='you want to train or test')
+        help='you want to train or test or generate')
+    parser.add_argument('--task', default = 'sort', type = str, 
+        help='which task: stc, couplet, or other')    
     args = parser.parse_args()
     print args
     mode = args.mode
-    # ----------------- 0. Configure logging module  ---------------------------------------
+    task = args.task
+
+    # ----------------- 0. Process the data  ---------------------------------------
+    # ----------------- 0.1 stc data -----------------------------------------------
+    if task == 'stc':
+        task_dir = '/slfs1/users/zjz17/github/data/stc_2017/'
+        data_dir = task_dir + 'data/'
+        params_dir = task_dir + 'params/'
+        params_prefix = 'stc'
+        enc_vocab_file = 'post.vocab'
+        dec_vocab_file = 'cmnt.vocab'
+        train_file = 'train.txt'
+        valid_file = 'valid.txt'
+        test_file = 'test.txt'
+        share_embed_weight = False
+    elif task == 'couplet':
+        task_dir = '/slfs1/users/zjz17/github/data/couplet/'
+        data_dir = task_dir + 'data/'
+        params_dir = task_dir + 'params/'
+        params_prefix = 'couplet'
+        enc_vocab_file = 'post.vocab'
+        dec_vocab_file = 'cmnt.vocab'
+        train_file = 'train.txt'
+        valid_file = 'valid.txt'
+        test_file = 'test.txt'
+        share_embed_weight = False
+    else:
+        task_dir = '/slfs1/users/zjz17/github/data/' + task + '/'
+        data_dir = task_dir + 'data/'
+        params_dir = task_dir + 'params/'
+        params_prefix = task
+        enc_vocab_file = 'q1.vocab'
+        dec_vocab_file = 'q1.vocab'
+        train_file = 'q1.train'
+        valid_file = 'q1.valid'
+        test_file = 'q1.valid'
+        share_embed_weight = True
+    enc_word2idx = read_dict(os.path.join(data_dir, enc_vocab_file))
+    dec_word2idx = read_dict(os.path.join(data_dir, dec_vocab_file))
+    
+    # ----------------- 1. Configure logging module  ---------------------------------------
     logging.basicConfig(
         level = logging.DEBUG,
         format = '%(asctime)s %(message)s', 
         datefmt = '%m-%d %H:%M:%S %p',  
-        filename = 'Log',
+        filename = task_dir + 'Log',
         filemode = 'w'
     )
     logger = logging.getLogger()
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
     logger.addHandler(console)
-
-    # ----------------- 1. Process the data  ---------------------------------------
-    data_dir = '/slfs1/users/zjz17/github/data/sort'
-    vocab_file = 'q1.vocab'
-    train_file = 'q1.train'
-    valid_file = 'q1.valid'
-    enc_word2idx = read_dict(os.path.join(data_dir, vocab_file))
-    dec_word2idx = read_dict(os.path.join(data_dir, vocab_file))
-
+    
     # -----------------2. Params Defination ----------------------------------------
-    num_buckets = 4
+    num_buckets = 5
     batch_size = 64
     # rnn network paramters
     num_layers = 1
@@ -47,20 +81,16 @@ if __name__ == '__main__':
     enc_dropout = 0.0
     dec_dropout = 0.0
     output_dropout = 0.2
-    num_embed = 400
-    num_hidden = 800
+    num_embed = 100
+    num_hidden = 200
     num_label = len(dec_word2idx)
     # encoder decoder parameters
     encoder_name = 'enc'
-    encoder_mode = 'lstm'
+    encoder_mode = 'gru'
     encoder_bi  = False
     decoder_name = 'dec'
-    decoder_mode = 'lstm'
+    decoder_mode = 'gru'
     init_states = generate_init_states_for_rnn(num_layers, encoder_name, encoder_mode, encoder_bi, batch_size, num_hidden)
-    print init_states
-    # training parameters
-    params_dir = 'params'
-    params_prefix = 'couplet'
     # program  parameters
     seed = 1
     np.random.seed(seed)
@@ -83,8 +113,7 @@ if __name__ == '__main__':
             batch_size = batch_size, 
             num_buckets = num_buckets
         )
-        frequent = train_iter.data_len / batch_size / 5 # log frequency
-
+        frequent = train_iter.data_len / batch_size / 20 # log frequency
         # ------------------4. Load paramters if exists ------------------------------
 
         model_args = {}
@@ -96,16 +125,17 @@ if __name__ == '__main__':
                 if f.startswith('%s-' % params_prefix) and f.endswith('.params'):
                     paramfilelist.append( int(re.split(r'[-.]', f)[1]) )
             last_iteration = max(paramfilelist)
-            print('laoding pretrained model %s/%s at epoch %d' % (params_dir, params_prefix, last_iteration))
-            tmp = mx.model.FeedForward.load('%s/%s' % (params_dir, params_prefix), last_iteration)
+            print('laoding pretrained model %s%s at epoch %d' % (params_dir, params_prefix, last_iteration))
+            sym, arg_params, aux_params = mx.model.load_checkpoint('%s/%s' % (params_dir, params_prefix), last_iteration)
             model_args.update({
-                'arg_params' : tmp.arg_params,
-                'aux_params' : tmp.aux_params,
-                'begin_epoch' : tmp.begin_epoch
+                'arg_params' : arg_params,
+                'aux_params' : aux_params,
+                'begin_epoch' : last_iteration
                 })
 
+
         # -----------------------5. Training ------------------------------------
-        def gen_sym(bucketkey):
+        def sym_gen(bucketkey):
             seq2seq_model = Seq2Seq(
                 enc_mode = encoder_mode, 
                 enc_bi = encoder_bi,
@@ -126,19 +156,13 @@ if __name__ == '__main__':
                 ignore_label = dec_word2idx.get('<PAD>'), 
                 dec_dropout = dec_dropout, 
                 dec_name = decoder_name,
-                output_dropout = output_dropout
+                output_dropout = output_dropout,
+                share_embed_weight = share_embed_weight
             )
-            return seq2seq_model.get_softmax()
-
-        model = mx.model.FeedForward(
-            ctx = [mx.context.gpu(i) for i in range(1)],
-            symbol = gen_sym,
-            num_epoch = 20,
-            optimizer = 'Adam',
-            wd = 0.,
-            initializer   = mx.init.Uniform(0.05),
-            **model_args
-        )
+            symbol = seq2seq_model.get_softmax()
+            data_names = [item[0] for item in train_iter.provide_data]
+            label_names = [item[0] for item in train_iter.provide_label]
+            return (symbol, data_names, label_names)
 
         if not os.path.exists(params_dir):
             os.makedirs(params_dir)
@@ -152,7 +176,7 @@ if __name__ == '__main__':
                 if int(label[i]) != ignore_label:
                     num += 1
                     loss += -np.log(max(1e-10, pred[i][int(label[i])]))
-            return np.exp(loss / num)
+            return loss / num
 
         def customized_metric(label, pred):
             label = label.T.reshape((-1,))
@@ -166,15 +190,29 @@ if __name__ == '__main__':
                         num += 1
             return float(num) / pred.shape[0] * 100
 
-        model.fit(
-            X = train_iter,
-            eval_data = valid_iter,
+        if num_buckets == 1:
+            mod = mx.mod.Module(*sym_gen(train_iter.default_bucket_key), context = [mx.gpu(1)])
+        else:
+            mod = mx.mod.BucketingModule(
+                sym_gen = sym_gen, 
+                default_bucket_key = train_iter.default_bucket_key, 
+                context = [mx.gpu(1)]
+            )
+        mod.fit(
+            train_data = train_iter, 
+            eval_data = valid_iter, 
+            num_epoch = 8,
             eval_metric = mx.metric.np(perplexity),
+            epoch_end_callback = [mx.callback.do_checkpoint('%s%s' % (params_dir, params_prefix), 1)],
             batch_end_callback = [mx.callback.Speedometer(batch_size, frequent = frequent)],
-            epoch_end_callback = [mx.callback.do_checkpoint('%s/%s' % (params_dir, params_prefix), 1)])
-    else:
-        tmp = mx.model.FeedForward.load('%s/%s' % (params_dir, params_prefix), 10)
-        arg_params = tmp.arg_params
+            initializer = mx.init.Uniform(0.05),
+            optimizer = 'Adam',
+            optimizer_params = {'wd': 0.0000},
+            **model_args
+            #optimizer_params = {'learning_rate':0.01, 'momentum': 0.9, 'wd': 0.0000}
+        )
+    elif mode == 'test':
+        sym, arg_params, aux_params = mx.model.load_checkpoint('%s/%s' % (params_dir, params_prefix), 1)
         while True:
             beam_search = BeamSearch(
                 arg_params = arg_params, 
@@ -201,7 +239,71 @@ if __name__ == '__main__':
                 output_dropout = output_dropout
             )
             beam_search.printout()
+    else:
+        dec_idx2word = {}
+        for k, v in dec_word2idx.items():
+            dec_idx2word[v] = k
+
+        enc_idx2word = {}
+        for k, v in enc_word2idx.items():
+            enc_idx2word[v] = k
+        g = open(task_dir+'generate.txt', 'w')
+        sym, arg_params, aux_params = mx.model.load_checkpoint('%s/%s' % (params_dir, params_prefix), 5)
+        path = os.path.join(data_dir, test_file)
+        with codecs.open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            enc_string = None
+            dec_string = None
+            while True:
+                line = f.readline()
+                if line == '':
+                    break
+                line_list = line.strip().split('\t=>\t')
+                if len(line_list) == 0 or line_list[0] == enc_string:
+                    continue
+                enc_string = line_list[0]
+                if len(line_list) >= 2:
+                    dec_string = '\n\t'.join(line_list[1:])
+                g.write('post: ' + enc_string + '\n')
+                g.write('cmnt: ' + dec_string + '\n')
+                g.write('beam search results:\n')
+                beam_search = BeamSearch(
+                    arg_params = arg_params, 
+                    enc_word2idx = enc_word2idx,  
+                    dec_word2idx = dec_word2idx, 
+                    enc_string = enc_string, 
+                    dec_string = dec_string,
+                    enc_mode = encoder_mode, 
+                    enc_bi = encoder_bi, 
+                    enc_num_layers = num_layers,
+                    enc_input_size = enc_input_size,   
+                    enc_num_embed = num_embed, 
+                    enc_num_hidden = num_hidden,
+                    enc_dropout = enc_dropout, 
+                    enc_name = encoder_name,
+                    dec_mode = decoder_mode, 
+                    dec_num_layers = num_layers, 
+                    dec_input_size = dec_input_size, 
+                    dec_num_embed = num_embed, 
+                    dec_num_hidden = num_hidden,
+                    dec_num_label = num_label, 
+                    dec_dropout = dec_dropout, 
+                    dec_name = decoder_name,
+                    output_dropout = output_dropout
+                )
+                result_sentences = beam_search.beam_search()
+                for pair in result_sentences:
+                    score = pair[0]
+                    sent = pair[1]
+                    mystr = ""
+                    for idx in sent:
+                        if dec_idx2word[idx] == '<EOS>':
+                            continue
+                        mystr += " " +  dec_idx2word[idx]
+                    g.write("score : %f, sentence: %s\n" % (score, mystr))
+                g.write('==============================================\n')
+            g.close()
 '''
+
 from rnn.rnn import RNN
 if __name__ == '__main__':
     def encoder(
@@ -222,10 +324,9 @@ if __name__ == '__main__':
             mask = enc_mask, 
             mode = mode, 
             seq_len = enc_len, 
-            real_seq_len = enc_length, 
             num_layers = num_layers, 
             num_hidden = num_hidden, 
-            bi_directional = bi_directional, 
+            bi_directional = bi_directional,
             states = None, 
             cells = None, 
             dropout = enc_dropout, 
@@ -234,22 +335,22 @@ if __name__ == '__main__':
         encoder_last_layer_hiddens = rnn_outputs['last_layer']
         encoder_last_time_cells = rnn_outputs['last_time']['cell']
         encoder_last_time_hiddens = rnn_outputs['last_time']['hidden']
-        return mx.sym.Group(encoder_last_time_hiddens)
+        return mx.sym.Group(encoder_last_layer_hiddens)
 
     enc_name = 'enc'
-    batch_size = 2
-    num_hidden = 5
+    batch_size = 1
+    num_hidden = 1
     num_lstm_layer = 1
     enc_len = 5
     bi_directional = True
-    mode = 'lstm'
+    mode = 'gru'
     encoder_symbol = encoder(
         mode = mode,
         bi_directional = bi_directional,
         num_layers = num_lstm_layer, 
         enc_len = 5, 
         enc_input_size = 10, 
-        num_embed = 5, 
+        num_embed = 1, 
         num_hidden = num_hidden, 
         enc_dropout = 0.0, 
         name = 'enc'
@@ -258,7 +359,7 @@ if __name__ == '__main__':
     init_states = generate_init_states_for_rnn(num_lstm_layer, 'enc', mode, bi_directional, batch_size, num_hidden)
     enc_data_shape = [("enc_data", (batch_size, enc_len))]
     enc_mask_shape = [("enc_mask", (batch_size, enc_len))]
-    enc_len_shape = [('enc_leng', (batch_size,))]
+    #enc_len_shape = [('enc_leng', (batch_size,))]
     enc_input_shapes = dict(init_states + enc_data_shape + enc_mask_shape)
     # bind the network and provide the pretrained parameters
     encoder_executor = encoder_symbol.simple_bind(ctx = mx.cpu(), **enc_input_shapes)
@@ -266,18 +367,45 @@ if __name__ == '__main__':
         if key.endswith('weight'): 
             s1, s2 = encoder_executor.arg_dict[key].shape
             #encoder_executor.arg_dict[key][:] = np.random.rand(s1, s2)
-            encoder_executor.arg_dict[key][:] = 1
+            encoder_executor.arg_dict[key][:] = 0.5
         print key, np.sum(encoder_executor.arg_dict[key].asnumpy())
 
     # provide the input data and forward the network
-    enc_data = mx.nd.array([[3, 4, 5, 2, 2], [2, 2, 1, 1, 1]])
-    enc_mask = mx.nd.array([[1, 1, 0, 0, 0], [1, 1, 1, 0, 0]])
-    enc_len = mx.nd.array([2, 3])
+    enc_data = mx.nd.array([1, 1, 1, 1, 1]).reshape((1,5))
+    enc_mask = mx.nd.array([1, 1, 1, 1, 1]).reshape((1,5))
+    enc_len = mx.nd.array([2])
     enc_data.copyto(encoder_executor.arg_dict["enc_data"])
     enc_mask.copyto(encoder_executor.arg_dict["enc_mask"])
-    enc_len.copyto(encoder_executor.arg_dict['enc_leng'])
+    #enc_len.copyto(encoder_executor.arg_dict['enc_leng'])
     encoder_executor.forward()
     for i in encoder_executor.outputs:
-        print i.shape
+        print i.asnumpy()
         print '================='
+
+    def sigmoid(x):
+        return 1 / (1 + math.exp(-x))
+
+    def tanh(x):
+        return (math.exp(x) - math.exp(-x)) / (math.exp(x) + math.exp(-x))
+
+    if mode == 'gru':
+        h = 0.0 
+        for i in range(5):
+            z = sigmoid(0.5 * 0.5 + 0.5 * h)
+            r = sigmoid(0.5 * 0.5 + 0.5 * h)
+            hh = tanh(0.5 * 0.5 + r * 0.5 * h)
+            h = h + z * (hh - h) 
+            print h
+    else:
+        h = 0.0 
+        c = 0.0
+        for i in range(5):
+            temp = 0.5 * 0.5 + 0.5 * h 
+            in_gate = sigmoid(temp)
+            in_trans = tanh(temp)
+            forget_gate = sigmoid(temp)
+            out_gate = sigmoid(temp)
+            c = (forget_gate * c) + (in_gate * in_trans)
+            h = out_gate * tanh(c)
+            print h
 '''
