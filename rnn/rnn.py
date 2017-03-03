@@ -304,8 +304,9 @@ class RNN(object):
         next_c = (forget_gate * prev_state.c) + (in_gate * in_transform)
         next_h = out_gate * mx.sym.Activation(next_c, act_type = "tanh")
         if mask is not None:
-            next_c = mx.sym.element_mask(next_c, mask, name = 'c_element_mask')
-            next_h = mx.sym.element_mask(next_h, mask, name = 'h_element_mask')
+            mask = mx.sym.Reshape(data = mask, shape = (-1, 1))
+            next_c = mx.sym.broadcast_mul(next_c, mask, name = 'c_broadcast_mul')
+            next_h = mx.sym.broadcast_mul(next_h, mask, name = 'h_broadcast_mul')
         
         return self.LSTMState(c = next_c, h = next_h)
 
@@ -322,7 +323,7 @@ class RNN(object):
             name = "t%d_l%d_gates_i2h"
         )
         h2h = mx.sym.FullyConnected(
-            data = indata,
+            data = prev_state.h,
             weight = param.gates_h2h_weight,
             bias = param.gates_h2h_bias,
             num_hidden = num_hidden * 2,
@@ -355,7 +356,8 @@ class RNN(object):
         h_trans_active = mx.sym.Activation(h_trans, act_type = "tanh")
         next_h = prev_state.h + update_gate * (h_trans_active - prev_state.h)
         if mask is not None:
-            next_h = mx.sym.element_mask(next_h, mask, name = 'h_element_mask')
+            mask = mx.sym.Reshape(data = mask, shape = (-1, 1))
+            next_h = mx.sym.broadcast_mul(next_h, mask, name = 'h_broadcast_mul')
         
         return self.GRUState(h = next_h)
 
