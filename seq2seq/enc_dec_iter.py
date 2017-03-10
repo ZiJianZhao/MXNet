@@ -45,7 +45,7 @@ class DummyIter(mx.io.DataIter):
         return self.the_batch
 
 def read_dict(path):
-    word2idx = {'<EOS>' : 0, '<UNK>' : 1, '<PAD>' : 2}
+    word2idx = {'<PAD>' : 0, '<EOS>' : 1, '<UNK>' : 2}
     idx = 3
     with codecs.open(path, 'r', encoding='utf-8', errors='ignore') as fid:
         for line in fid:
@@ -57,8 +57,6 @@ def read_dict(path):
             idx += 1
     return word2idx
 
-# ------------------------ transform text into numbers --------------------------
-# ------------------------ 1. post and cmnt (post=>cmnt1=>cmnt2=>cmnt3) in one file ----------------------------
 def get_enc_dec_text_id(path, enc_word2idx, dec_word2idx):
     enc_data = []
     dec_data = []
@@ -77,26 +75,8 @@ def get_enc_dec_text_id(path, enc_word2idx, dec_word2idx):
                 dec_data.append(dec)
     return enc_data, dec_data
 
-def generate_init_states_for_rnn(num_layers, prefix, rnn_mode, rnn_bi, batch_size, num_hidden):
-    init_h = [('%s_l%d_init_h' % (prefix, i), (batch_size, num_hidden)) for i in range(num_layers)]
-    init_c = [('%s_l%d_init_c' % (prefix, i), (batch_size, num_hidden)) for i in range(num_layers)]
-    bi_forward_init_h = [('%s_forward_l%d_init_h' % (prefix, i), (batch_size, num_hidden)) for i in range(num_layers)]
-    bi_forward_init_c = [('%s_forward_l%d_init_c' % (prefix, i), (batch_size, num_hidden)) for i in range(num_layers)]
-    bi_backward_init_h = [('%s_backward_l%d_init_h' % (prefix, i), (batch_size, num_hidden)) for i in range(num_layers)]
-    bi_backward_init_c = [('%s_backward_l%d_init_c' % (prefix, i), (batch_size, num_hidden)) for i in range(num_layers)]    
-    if rnn_mode == 'lstm':
-        if rnn_bi:
-            return bi_forward_init_h + bi_backward_init_h + bi_forward_init_c +  bi_backward_init_c
-        else:
-            return init_h + init_c
-    else:
-        if rnn_bi:
-            return bi_forward_init_h + bi_backward_init_h
-        else:
-            return init_h
-
 class EncoderDecoderIter(mx.io.DataIter):
-    def __init__(self, enc_word2idx, dec_word2idx, filename, init_states,
+    def __init__(self, enc_word2idx, dec_word2idx, filename, #init_states,
                 batch_size = 20, num_buckets = 5, DEBUG = False):
         
         super(EncoderDecoderIter, self).__init__()
@@ -106,6 +86,9 @@ class EncoderDecoderIter(mx.io.DataIter):
         self.pad = self.enc_word2idx.get('<PAD>')
         self.eos = self.enc_word2idx.get('<EOS>')
         self.enc_data, self.dec_data = get_enc_dec_text_id(filename, enc_word2idx, dec_word2idx)
+        print 'Text2digit Preprocess Example:'
+        for i in range(4):
+            print self.enc_data[i], self.dec_data[i]
         self.data_len = len(self.enc_data)
         self.DEBUG = DEBUG
         self.enc_data_name = 'enc_data'
@@ -115,8 +98,8 @@ class EncoderDecoderIter(mx.io.DataIter):
         self.label_name = 'label'
         self.batch_size = batch_size
 
-        self.init_states = init_states
-        self.init_state_arrays = [mx.nd.zeros(x[1]) for x in self.init_states]
+        #self.init_states = init_states
+        #self.init_state_arrays = [mx.nd.zeros(x[1]) for x in self.init_states]
         
         # Automatically generate buckets
         self.num_buckets = num_buckets
@@ -166,7 +149,7 @@ class EncoderDecoderIter(mx.io.DataIter):
         p_data = [('enc_data' , (self.batch_size, self.default_bucket_key.enc_len)),
                   ('enc_mask' , (self.batch_size, self.default_bucket_key.enc_len)),
                   ('dec_data' , (self.batch_size, self.default_bucket_key.dec_len)),
-                  ('dec_mask' , (self.batch_size, self.default_bucket_key.dec_len)),] + self.init_states
+                  ('dec_mask' , (self.batch_size, self.default_bucket_key.dec_len)),] #+ self.init_states
         return p_data
 
     @property
@@ -175,7 +158,7 @@ class EncoderDecoderIter(mx.io.DataIter):
         return p_label
 
     def __iter__(self):
-        init_state_names = [x[0] for x in self.init_states]
+        #init_state_names = [x[0] for x in self.init_states]
 
         for i_bucket in self.bucket_plan:
             enc_data = self.enc_data_buffer[i_bucket]
@@ -194,10 +177,10 @@ class EncoderDecoderIter(mx.io.DataIter):
             dec_mask[:] = self.dec_mask[i_bucket][idx]      
             label[:] = self.label[i_bucket][idx]
 
-            data_all = [mx.nd.array(enc_data), mx.nd.array(enc_mask),mx.nd.array(dec_data), mx.nd.array(dec_mask) ]   + self.init_state_arrays
+            data_all = [mx.nd.array(enc_data), mx.nd.array(enc_mask),mx.nd.array(dec_data), mx.nd.array(dec_mask) ]  #+ self.init_state_arrays
             label_all = [mx.nd.array(label)]
             
-            data_names = ['enc_data', 'enc_mask', 'dec_data', 'dec_mask'] + init_state_names
+            data_names = ['enc_data', 'enc_mask', 'dec_data', 'dec_mask'] #+ init_state_names
             label_names = ['label']
 
             data_batch = EncoderDecoderBatch(data_names, data_all, label_names, label_all,

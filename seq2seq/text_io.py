@@ -144,7 +144,7 @@ class DataGeneration(object):
 
 if __name__ == '__main__':
     data_gen = DataGeneration(100, 50000, 1000, 10)
-    data_gen.generate_q1_pairs('/slfs1/users/zjz17/github/data/sort/')
+    data_gen.generate_q1_pairs('/slfs1/users/zjz17/github/data/sort/data')
 
 DEBUG = False
 # -------------------------- build dict ---------------------------------------------------- 
