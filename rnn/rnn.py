@@ -11,11 +11,11 @@ class BaseRNN(object):
 
     Args:
 
-
     '''
     def __init__(self, name='rnn'):
         super(BaseRNN, self).__init__()
         self.name = name
+        self.reset()
 
     def __call__(self, data, states, mask=None):
         '''Construct symbol for one-step RNN'''
@@ -80,7 +80,10 @@ class BaseRNN(object):
                 output, states = self(data[k], states, mask[k])
             else:
                 output, states = self(data[k], states)
-            outputs.append(output)
+            if forward:
+                outputs.append(output)
+            else:
+                outputs.insert(0, output)
         if merge_outputs:
             outputs = [mx.symbol.expand_dims(i, axis=axis) for i in outputs]
             outputs = mx.symbol.Concat(*outputs, dim=axis)
